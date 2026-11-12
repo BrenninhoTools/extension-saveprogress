@@ -4,6 +4,8 @@ Automatic progress saving for Haxe/Lime games. Set values or track your game obj
 
 ## Features
 
+- Automatic and manual modes
+- Manual saves (checkpoints) with labels and timestamps, per slot
 - Automatic saving: on change (debounced), on interval, on focus loss/minimize/background, on exit and on `FlxState` switch
 - Tracked values: bind getters/setters or object fields once, they are captured on every save and restored on load
 - Multiple save slots, slot listing, copying and deletion
@@ -53,6 +55,7 @@ Tracked values are restored immediately if a save exists, and captured automatic
 
 ```haxe
 SaveProgress.init("MyGame", {
+	mode: AUTO,
 	slot: "default",
 	directory: null,
 	interval: 60,
@@ -65,6 +68,43 @@ SaveProgress.init("MyGame", {
 ```
 
 All options can also be changed later through the static fields of `SaveProgress`. Set `interval` to `0` to disable periodic saving, and `SaveProgress.enabled = false` to pause all automatic saving.
+
+### Manual saving
+
+Use `MANUAL` mode to disable every automatic trigger. Nothing is written until you call `save()`.
+
+```haxe
+import saveprogress.SaveMode;
+
+SaveProgress.init("MyGame", {mode: MANUAL});
+
+SaveProgress.set("coins", 50);
+
+if (SaveProgress.hasUnsavedChanges())
+	SaveProgress.save();
+
+SaveProgress.discardChanges();
+```
+
+The mode can be switched at any time with `SaveProgress.mode = AUTO` or `SaveProgress.mode = MANUAL`.
+
+### Manual saves (checkpoints)
+
+Manual saves are named copies of the current slot, available in both modes. They are never overwritten by automatic saving.
+
+```haxe
+SaveProgress.saveTo("checkpoint1", "Before the boss");
+
+for (save in SaveProgress.listSaves())
+	Sys.println(save.name + " - " + save.label + " - " + save.date);
+
+SaveProgress.loadFrom("checkpoint1");
+SaveProgress.hasSave("checkpoint1");
+SaveProgress.getSaveInfo("checkpoint1");
+SaveProgress.deleteSave("checkpoint1");
+```
+
+`listSaves()` returns the newest saves first. In `AUTO` mode, `loadFrom` also writes the restored data to the slot right away.
 
 ### Slots
 
@@ -96,6 +136,8 @@ Without Lime, call `SaveProgress.tick()` from your own update loop if `haxe.Time
 SaveProgress.onSave.add(slot -> showSaveIcon());
 SaveProgress.onLoad.add(slot -> if (slot.recovered) showRecoveredMessage());
 SaveProgress.onError.add(message -> Sys.println(message));
+SaveProgress.onManualSave.add(save -> showMessage("Saved: " + save.label));
+SaveProgress.onManualLoad.add(save -> showMessage("Loaded: " + save.label));
 ```
 
 ## Storage location

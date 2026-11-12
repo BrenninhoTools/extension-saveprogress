@@ -7,10 +7,13 @@ class SaveProgress
 	public static final onSave:SaveSignal<SaveSlot> = new SaveSignal<SaveSlot>();
 	public static final onLoad:SaveSignal<SaveSlot> = new SaveSignal<SaveSlot>();
 	public static final onError:SaveSignal<String> = new SaveSignal<String>();
+	public static final onManualSave:SaveSignal<SaveSnapshot> = new SaveSignal<SaveSnapshot>();
+	public static final onManualLoad:SaveSignal<SaveSnapshot> = new SaveSignal<SaveSnapshot>();
 
 	public static var initialized(default, null):Bool = false;
 	public static var id(default, null):String = "game";
 	public static var enabled:Bool = true;
+	public static var mode:SaveMode = SaveMode.AUTO;
 	public static var interval:Float = 60;
 	public static var saveOnChange:Bool = true;
 	public static var changeDelay:Float = 1.5;
@@ -42,6 +45,8 @@ class SaveProgress
 
 		if (options != null)
 		{
+			if (options.mode != null)
+				mode = options.mode;
 			if (options.directory != null)
 				SaveStorage.directory = options.directory;
 			if (options.interval != null)
@@ -70,7 +75,8 @@ class SaveProgress
 	{
 		if (!initialized)
 			return;
-		flushAll();
+		if (autoActive())
+			flushAll();
 		unhook();
 		slots.clear();
 		changePending = false;
@@ -82,7 +88,7 @@ class SaveProgress
 	{
 		ensureInitialized();
 		var previous = slots.get(slotName);
-		if (previous != null && previous.name != name && previous.dirty)
+		if (previous != null && previous.name != name && previous.dirty && autoActive())
 			previous.flush();
 		slotName = name;
 		return getSlot(name);
@@ -108,7 +114,7 @@ class SaveProgress
 	public static function listSlots():Array<String>
 	{
 		var prefix = id + "-";
-		var names = [for (key in SaveStorage.list(prefix)) key.substr(prefix.length)];
+		var names = [for (key in SaveStorage.list(prefix)) if (key.indexOf("@") == -1) key.substr(prefix.length)];
 		for (name in slots.keys())
 		{
 			var key = keyOf(name).substr(prefix.length);
@@ -125,6 +131,8 @@ class SaveProgress
 			existing.erase();
 		else
 			SaveStorage.delete(keyOf(name));
+		for (file in SaveStorage.list(keyOf(name) + "@"))
+			SaveStorage.delete(file);
 	}
 
 	public static function copySlot(from:String, to:String):Bool
@@ -154,6 +162,53 @@ class SaveProgress
 	public static inline function untrack(field:String):Bool
 		return slot.untrack(field);
 
+	public static function save():Bool
+	{
+		return slot.flush(true);
+	}
+
+	public static function saveTo(name:String, ?label:String):Null<SaveSnapshot>
+	{
+		return slot.saveSnapshot(name, label);
+	}
+
+	public static function loadFrom(name:String):Bool
+	{
+		return slot.loadSnapshot(name);
+	}
+
+	public static function listSaves():Array<SaveSnapshot>
+	{
+		return slot.listSnapshots();
+	}
+
+	public static function hasSave(name:String):Bool
+	{
+		return slot.snapshotExists(name);
+	}
+
+	public static function getSaveInfo(name:String):Null<SaveSnapshot>
+	{
+		return slot.snapshotInfo(name);
+	}
+
+	public static function deleteSave(name:String):Bool
+	{
+		return slot.deleteSnapshot(name);
+	}
+
+	public static function hasUnsavedChanges():Bool
+	{
+		return slot.hasChanges();
+	}
+
+	public static function discardChanges():Bool
+	{
+		changePending = false;
+		changeElapsed = 0;
+		return slot.reload();
+	}
+
 	public static function flush(force:Bool = false):Bool
 	{
 		return slot.flush(force);
@@ -180,7 +235,7 @@ class SaveProgress
 			elapsed = lastTick < 0 ? 0 : now - lastTick;
 		lastTick = now;
 
-		if (!enabled)
+		if (!autoActive())
 			return;
 
 		if (changePending)
@@ -204,7 +259,7 @@ class SaveProgress
 	@:allow(saveprogress.SaveSlot)
 	static function notifyChange(changed:SaveSlot):Void
 	{
-		if (!enabled || !saveOnChange)
+		if (!autoActive() || !saveOnChange)
 			return;
 		changePending = true;
 		changeElapsed = 0;
@@ -219,6 +274,11 @@ class SaveProgress
 		for (existing in slots)
 			if (existing.dirty)
 				existing.flush();
+	}
+
+	static inline function autoActive():Bool
+	{
+		return enabled && mode == SaveMode.AUTO;
 	}
 
 	static function keyOf(name:String):String
@@ -240,20 +300,20 @@ class SaveProgress
 
 	static function handleExit(code:Int):Void
 	{
-		if (enabled && saveOnExit)
+		if (autoActive() && saveOnExit)
 			flushAll();
 	}
 
 	static function handleFocusLost():Void
 	{
-		if (enabled && saveOnFocusLost)
+		if (autoActive() && saveOnFocusLost)
 			flushAll();
 	}
 
 	#if flixel
 	static function handleStateSwitch():Void
 	{
-		if (enabled && saveOnStateSwitch)
+		if (autoActive() && saveOnStateSwitch)
 			flushAll();
 	}
 	#end

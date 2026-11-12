@@ -2,6 +2,7 @@ package saveprogress;
 
 typedef SaveOptions =
 {
+	?mode:SaveMode,
 	?slot:String,
 	?directory:String,
 	?interval:Float,
