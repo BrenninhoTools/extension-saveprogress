@@ -1,0 +1,12 @@
+{
+	"name": "extension-saveprogress",
+	"url": "https://github.com/BrenninhoTools/extension-saveprogress",
+	"license": "MIT",
+	"tags": ["save", "autosave", "progress", "lime", "openfl", "flixel", "mobile", "cross"],
+	"description": "Automatic progress saving for Haxe/Lime games with slots, tracked values, crash-safe writes and backups.",
+	"version": "1.0.0",
+	"releasenote": "Initial release.",
+	"classPath": "src",
+	"contributors": ["Brenninho"],
+	"dependencies": {}
+}
